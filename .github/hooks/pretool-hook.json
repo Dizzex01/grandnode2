@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "hooks": {
+    "sessionStart": [
+        {
+            "type": "command",
+            "bash": "echo \"Session started: $(date)\" >> ./session.log",
+            "powershell": "Add-Content -Path _session.log -Value \"Session started: $(Get-Date)\"",
+            "cwd": ".",
+            "timeoutSec": 10
+        }
+    ],
+    "preToolUse": [
+        {
+            "type": "command",
+            "bash": "echo 'This is a pre-tool-use hook for the command tool.'"
+        }
+    ],
+    "postToolUse": [
+        {
+            "type": "command",
+            "bash": "echo 'Tool used' && echo 'This is a post-tool-use hook for the command tool. Done on - \"$TOOL_INPUT_FILE_PATH\"'",
+            "powershell": "./.github/hooks/pw.ps1 -ToolName \"$env:TOOL_NAME\" -ToolInputFilePath \"$env:TOOL_INPUT_FILE_PATH\""
+        }
+    ]
+  }
+}
