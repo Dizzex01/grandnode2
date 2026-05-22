@@ -39,7 +39,9 @@
     <None Update="logo.jpg">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
-
+    <None Update="spinwheel.js">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
 
 </Project>

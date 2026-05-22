@@ -52,7 +52,7 @@ public class SpinWheelCommandHandlerTests
 
         _customerServiceMock
             .Setup(c => c.GetCustomerById(It.IsAny<string>()))
-            .ReturnsAsync(new Customer { Id = "cust1" });
+            .ReturnsAsync(new Customer());
         _customerServiceMock
             .Setup(c => c.UpdateUserField(It.IsAny<Customer>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()))
             .Returns(Task.CompletedTask);
@@ -68,7 +68,7 @@ public class SpinWheelCommandHandlerTests
     public async Task Handle_FirstSpin_ReturnsSuccessAndPersistsRecord()
     {
         var result = await _handler.Handle(
-            new SpinWheelCommand { CustomerId = "cust1", StoreId = "store1" },
+            new SpinWheelCommand { CustomerId = "cust1", StoreId = "store1", CurrencyCode = "USD" },
             CancellationToken.None);
 
         Assert.IsTrue(result.Success);
@@ -77,14 +77,13 @@ public class SpinWheelCommandHandlerTests
         var record = await _spinRecordRepository.GetOneAsync(r => r.CustomerId == "cust1");
         Assert.IsNotNull(record);
         Assert.AreEqual(1, record.TotalSpins);
-        Assert.AreEqual(1, record.EarnedCoupons.Count);
     }
 
     [TestMethod]
     public async Task Handle_CouponCodeFormat_MatchesPrefixDashSixAlphanumeric()
     {
         var result = await _handler.Handle(
-            new SpinWheelCommand { CustomerId = "cust1", StoreId = "store1" },
+            new SpinWheelCommand { CustomerId = "cust1", StoreId = "store1", CurrencyCode = "USD" },
             CancellationToken.None);
 
         var parts = result.CouponCode.Split('-');
@@ -103,11 +102,92 @@ public class SpinWheelCommandHandlerTests
         });
 
         var result = await _handler.Handle(
-            new SpinWheelCommand { CustomerId = "cust1", StoreId = "store1" },
+            new SpinWheelCommand { CustomerId = "cust1", StoreId = "store1", CurrencyCode = "USD" },
             CancellationToken.None);
 
         Assert.IsFalse(result.Success);
         Assert.IsNotNull(result.ErrorMessage);
+    }
+
+    [TestMethod]
+    public async Task Handle_Disabled_ReturnsFailure()
+    {
+        _settingServiceMock
+            .Setup(s => s.LoadSetting<SpinWheelSettings>(It.IsAny<string>()))
+            .ReturnsAsync(new SpinWheelSettings { Enabled = false, Segments = _defaultSettings.Segments });
+
+        var result = await _handler.Handle(
+            new SpinWheelCommand { CustomerId = "cust1", StoreId = "store1", CurrencyCode = "USD" },
+            CancellationToken.None);
+
+        Assert.IsFalse(result.Success);
+        Assert.IsNotNull(result.ErrorMessage);
+    }
+
+    [TestMethod]
+    public async Task Handle_NoSegments_ReturnsFailure()
+    {
+        _settingServiceMock
+            .Setup(s => s.LoadSetting<SpinWheelSettings>(It.IsAny<string>()))
+            .ReturnsAsync(new SpinWheelSettings { Enabled = true, Segments = new List<SpinSegment>() });
+
+        var result = await _handler.Handle(
+            new SpinWheelCommand { CustomerId = "cust1", StoreId = "store1", CurrencyCode = "USD" },
+            CancellationToken.None);
+
+        Assert.IsFalse(result.Success);
+        Assert.IsNotNull(result.ErrorMessage);
+    }
+
+    [TestMethod]
+    public async Task Handle_SecondSpin_IncrementsTotalSpins()
+    {
+        await _spinRecordRepository.InsertAsync(new CustomerSpinRecord {
+            CustomerId = "cust1",
+            LastSpinUtc = DateTime.UtcNow.AddHours(-48),
+            TotalSpins = 3
+        });
+
+        await _handler.Handle(
+            new SpinWheelCommand { CustomerId = "cust1", StoreId = "store1", CurrencyCode = "USD" },
+            CancellationToken.None);
+
+        var record = await _spinRecordRepository.GetOneAsync(r => r.CustomerId == "cust1");
+        Assert.AreEqual(4, record.TotalSpins);
+    }
+
+    [TestMethod]
+    public async Task Handle_CreatesDiscountWithCorrectFields()
+    {
+        Discount createdDiscount = null;
+        _discountServiceMock
+            .Setup(d => d.InsertDiscount(It.IsAny<Discount>()))
+            .Callback<Discount>(d => createdDiscount = d)
+            .Returns(Task.CompletedTask);
+
+        await _handler.Handle(
+            new SpinWheelCommand { CustomerId = "cust1", StoreId = "store1", CurrencyCode = "EUR" },
+            CancellationToken.None);
+
+        Assert.IsNotNull(createdDiscount);
+        Assert.IsTrue(createdDiscount.RequiresCouponCode);
+        Assert.IsTrue(createdDiscount.UsePercentage);
+        Assert.IsTrue(createdDiscount.IsEnabled);
+        Assert.IsFalse(createdDiscount.Reused);
+        Assert.AreEqual("EUR", createdDiscount.CurrencyCode);
+        Assert.AreEqual(Grand.Domain.Discounts.DiscountType.AssignedToOrderTotal, createdDiscount.DiscountTypeId);
+    }
+
+    [TestMethod]
+    public async Task Handle_AppliesCouponToCustomer()
+    {
+        await _handler.Handle(
+            new SpinWheelCommand { CustomerId = "cust1", StoreId = "store1", CurrencyCode = "USD" },
+            CancellationToken.None);
+
+        _customerServiceMock.Verify(
+            c => c.UpdateUserField(It.IsAny<Customer>(), Grand.Domain.Customers.SystemCustomerFieldNames.DiscountCoupons, It.IsAny<string>(), It.IsAny<string>()),
+            Times.Once);
     }
 
     [TestMethod]
@@ -119,7 +199,7 @@ public class SpinWheelCommandHandlerTests
         for (var i = 0; i < trials; i++) {
             await _spinRecordRepository.DeleteManyAsync(r => r.CustomerId == "distTest");
             var result = await _handler.Handle(
-                new SpinWheelCommand { CustomerId = "distTest", StoreId = "store1" },
+                new SpinWheelCommand { CustomerId = "distTest", StoreId = "store1", CurrencyCode = "USD" },
                 CancellationToken.None);
 
             var segId = _defaultSettings.Segments[result.WinningSegmentIndex].Id;

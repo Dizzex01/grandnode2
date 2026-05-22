@@ -4,6 +4,7 @@ public class ConfigureModel
 {
     public bool Enabled { get; set; }
     public int CooldownHours { get; set; } = 72;
+    public int MenuDisplayOrder { get; set; } = 100;
     public List<SegmentConfigModel> Segments { get; set; } = new();
 }
 

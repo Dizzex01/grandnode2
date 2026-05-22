@@ -23,6 +23,13 @@
                     <span class="hint">Hours between spins per customer. E.g. 72 = once every 3 days.</span>
                 </div>
             </div>
+            <div class="form-group row">
+                <admin-label asp-for="MenuDisplayOrder" />
+                <div class="col-md-9">
+                    <admin-input asp-for="MenuDisplayOrder" />
+                    <span class="hint">Controls where "Spin to Win" appears in the navigation menu. Lower numbers appear higher. Set to the same value as the item you want it to appear after, plus one.</span>
+                </div>
+            </div>
         </div>
     </div>
 

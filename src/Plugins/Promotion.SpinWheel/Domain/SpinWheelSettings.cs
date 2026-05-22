@@ -7,6 +7,12 @@ public class SpinWheelSettings : ISettings
     public bool Enabled { get; set; }
     public int CooldownHours { get; set; } = 72;
     public List<SpinSegment> Segments { get; set; } = new();
+
+    /// <summary>Display order for the Spin to Win nav category. Lower = higher in menu.</summary>
+    public int MenuDisplayOrder { get; set; } = 100;
+
+    /// <summary>Id of the synthetic Category created in MongoDB to represent the menu item.</summary>
+    public string MenuCategoryId { get; set; } = string.Empty;
 }
 
 public class SpinSegment

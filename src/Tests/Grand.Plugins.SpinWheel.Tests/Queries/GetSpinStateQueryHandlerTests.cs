@@ -1,7 +1,6 @@
 using Grand.Business.Core.Interfaces.Common.Configuration;
 using Grand.Data;
 using Grand.Data.Tests.MongoDb;
-using Grand.Domain.Configuration;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
 using Promotion.SpinWheel.Domain;
@@ -79,5 +78,33 @@ public class GetSpinStateQueryHandlerTests
             CancellationToken.None);
 
         Assert.IsTrue(result.CanSpin);
+    }
+
+    [TestMethod]
+    public async Task Handle_Disabled_IsEnabledFalse()
+    {
+        _settingServiceMock
+            .Setup(s => s.LoadSetting<SpinWheelSettings>(It.IsAny<string>()))
+            .ReturnsAsync(new SpinWheelSettings { Enabled = false, CooldownHours = 24, Segments = new List<SpinSegment>() });
+
+        var result = await _handler.Handle(
+            new GetSpinStateQuery { CustomerId = "cust1", StoreId = "store1" },
+            CancellationToken.None);
+
+        Assert.IsFalse(result.IsEnabled);
+    }
+
+    [TestMethod]
+    public async Task Handle_SegmentsMappedCorrectly()
+    {
+        var result = await _handler.Handle(
+            new GetSpinStateQuery { CustomerId = "cust1", StoreId = "store1" },
+            CancellationToken.None);
+
+        Assert.AreEqual(2, result.Segments.Count);
+        Assert.AreEqual("s1", result.Segments[0].Id);
+        Assert.AreEqual("10% Off", result.Segments[0].Label);
+        Assert.AreEqual(50, result.Segments[0].ProbabilityWeight);
+        Assert.AreEqual("#059669", result.Segments[0].Color);
     }
 }

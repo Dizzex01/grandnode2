@@ -5,14 +5,12 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Promotion.SpinWheel.Commands;
 using Promotion.SpinWheel.Queries;
-using Promotion.SpinWheel.Services;
 
 namespace Promotion.SpinWheel.Controllers;
 
 [Authorize]
 public class SpinWheelController(
     IMediator mediator,
-    ISpinCouponReconciliationService reconciliationService,
     IContextAccessor contextAccessor)
     : BasePublicController
 {
@@ -30,8 +28,6 @@ public class SpinWheelController(
         if (!state.IsEnabled)
             return RedirectToRoute("HomePage");
 
-        await reconciliationService.EnsureApplied(customerId);
-
         return View(state);
     }
 
@@ -43,7 +39,8 @@ public class SpinWheelController(
 
         var result = await mediator.Send(new SpinWheelCommand {
             CustomerId = customerId,
-            StoreId = storeId
+            StoreId = storeId,
+            CurrencyCode = contextAccessor.WorkContext.WorkingCurrency.CurrencyCode
         });
 
         return Json(result);

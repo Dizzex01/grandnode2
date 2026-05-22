@@ -7,6 +7,7 @@ using Grand.Domain.Discounts;
 using MediatR;
 using Promotion.SpinWheel.Domain;
 using Promotion.SpinWheel.Models;
+using System.Security.Cryptography;
 
 namespace Promotion.SpinWheel.Commands;
 
@@ -14,6 +15,7 @@ public class SpinWheelCommand : IRequest<SpinExecuteResult>
 {
     public string CustomerId { get; set; } = string.Empty;
     public string StoreId { get; set; } = string.Empty;
+    public string CurrencyCode { get; set; } = string.Empty;
 }
 
 public class SpinWheelCommandHandler(
@@ -52,7 +54,8 @@ public class SpinWheelCommandHandler(
             IsEnabled = true,
             Reused = false,
             IsCumulative = false,
-            StartDateUtc = now
+            StartDateUtc = now,
+            CurrencyCode = request.CurrencyCode
         };
         await discountService.InsertDiscount(discount);
 
@@ -62,39 +65,17 @@ public class SpinWheelCommandHandler(
             Used = false
         });
 
-        var earnedCoupon = new SpinEarnedCoupon {
-            CouponCode = couponCode,
-            DiscountLabel = segment.Label,
-            EarnedAtUtc = now,
-            AppliedToCart = false
-        };
+        var isNew = record == null;
+        record ??= new CustomerSpinRecord { CustomerId = request.CustomerId };
+        record.LastSpinUtc = now;
+        record.TotalSpins++;
+        if (isNew) await spinRecordRepository.InsertAsync(record);
+        else await spinRecordRepository.UpdateAsync(record);
 
-        if (record == null) {
-            record = new CustomerSpinRecord {
-                CustomerId = request.CustomerId,
-                LastSpinUtc = now,
-                TotalSpins = 1,
-                EarnedCoupons = new List<SpinEarnedCoupon> { earnedCoupon }
-            };
-            await spinRecordRepository.InsertAsync(record);
-        } else {
-            record.LastSpinUtc = now;
-            record.TotalSpins++;
-            record.EarnedCoupons.Add(earnedCoupon);
-            await spinRecordRepository.UpdateAsync(record);
-        }
-
-        // Apply to cart — non-critical
-        try {
-            var customer = await customerService.GetCustomerById(request.CustomerId);
-            if (customer != null) {
-                var applied = customer.ApplyCouponCode(SystemCustomerFieldNames.DiscountCoupons, couponCode);
-                await customerService.UpdateUserField(customer, SystemCustomerFieldNames.DiscountCoupons, applied);
-                earnedCoupon.AppliedToCart = true;
-                await spinRecordRepository.UpdateAsync(record);
-            }
-        } catch {
-            // Reconciliation handles this on next cart load
+        var customer = await customerService.GetCustomerById(request.CustomerId);
+        if (customer != null) {
+            var applied = customer.ApplyCouponCode(SystemCustomerFieldNames.DiscountCoupons, couponCode);
+            await customerService.UpdateUserField(customer, SystemCustomerFieldNames.DiscountCoupons, applied);
         }
 
         return new SpinExecuteResult {
@@ -118,13 +99,8 @@ public class SpinWheelCommandHandler(
         return segments[^1];
     }
 
-    private static string GenerateAlphanumeric(int length)
-    {
-        const string chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-        return new string(Enumerable.Range(0, length)
-            .Select(_ => chars[Random.Shared.Next(chars.Length)])
-            .ToArray());
-    }
+    private static string GenerateAlphanumeric(int length) =>
+        RandomNumberGenerator.GetString("ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789", length);
 
     private static SpinExecuteResult Fail(string message) =>
         new() { Success = false, ErrorMessage = message };

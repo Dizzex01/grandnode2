@@ -1,35 +1,28 @@
+using Grand.Business.Core.Interfaces.Catalog.Categories;
+using Grand.Business.Core.Interfaces.Common.Configuration;
 using Grand.Business.Core.Interfaces.Common.Localization;
-using Grand.Data;
-using Grand.Domain.Admin;
 using Grand.Infrastructure.Plugins;
+using Promotion.SpinWheel.Domain;
+using Promotion.SpinWheel.Services;
 
 namespace Promotion.SpinWheel;
 
 public class SpinWheelPlugin(
     IPluginTranslateResource pluginTranslateResource,
-    IRepository<AdminSiteMap> siteMapRepository)
+    ISettingService settingService,
+    ICategoryService categoryService)
     : BasePlugin, IPlugin
 {
+    public override string ConfigurationUrl() => "/Admin/SpinWheelConfig/Configure";
+
     public override async Task Install()
     {
         await pluginTranslateResource.AddOrUpdatePluginTranslateResource(
             "Plugins.Promotion.SpinWheel.Title", "Spin to Win");
-        await pluginTranslateResource.AddOrUpdatePluginTranslateResource(
-            "Plugins.Promotion.SpinWheel.Menu", "Spin Wheel");
 
-        // Add menu entry under Marketing
-        var marketing = siteMapRepository.Table.FirstOrDefault(x => x.SystemName == "Marketing");
-        if (marketing != null && marketing.ChildNodes.All(c => c.SystemName != "SpinWheel")) {
-            marketing.ChildNodes.Add(new AdminSiteMap {
-                SystemName = "SpinWheel",
-                ResourceName = "Plugins.Promotion.SpinWheel.Menu",
-                ControllerName = "SpinWheelConfig",
-                ActionName = "Configure",
-                DisplayOrder = 99,
-                IconClass = "fa fa-dot-circle-o"
-            });
-            await siteMapRepository.UpdateAsync(marketing);
-        }
+        var menuService = new SpinWheelMenuCategoryService(categoryService, settingService);
+        var settings = new SpinWheelSettings();
+        await menuService.UpsertMenuCategory(settings, string.Empty);
 
         await base.Install();
     }
@@ -38,18 +31,10 @@ public class SpinWheelPlugin(
     {
         await pluginTranslateResource.DeletePluginTranslationResource(
             "Plugins.Promotion.SpinWheel.Title");
-        await pluginTranslateResource.DeletePluginTranslationResource(
-            "Plugins.Promotion.SpinWheel.Menu");
 
-        // Remove menu entry
-        var marketing = siteMapRepository.Table.FirstOrDefault(x => x.SystemName == "Marketing");
-        if (marketing != null) {
-            var node = marketing.ChildNodes.FirstOrDefault(c => c.SystemName == "SpinWheel");
-            if (node != null) {
-                marketing.ChildNodes.Remove(node);
-                await siteMapRepository.UpdateAsync(marketing);
-            }
-        }
+        var menuService = new SpinWheelMenuCategoryService(categoryService, settingService);
+        var settings = await settingService.LoadSetting<SpinWheelSettings>(string.Empty);
+        await menuService.DeleteMenuCategory(settings, string.Empty);
 
         await base.Uninstall();
     }

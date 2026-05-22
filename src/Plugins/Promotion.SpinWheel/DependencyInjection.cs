@@ -11,7 +11,7 @@ public class StartupApplication : IStartupApplication
 {
     public void ConfigureServices(IServiceCollection services, IConfiguration configuration)
     {
-        services.AddScoped<ISpinCouponReconciliationService, SpinCouponReconciliationService>();
+        services.AddScoped<SpinWheelMenuCategoryService>();
     }
 
     public void Configure(WebApplication application, IWebHostEnvironment webHostEnvironment) { }

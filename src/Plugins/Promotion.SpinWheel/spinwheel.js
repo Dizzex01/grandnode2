@@ -62,6 +62,8 @@ Vue.component('spin-wheel', {
             this.spinning = true;
             this.result = null;
 
+            console.log('Spinning the wheel...');
+
             const token = document.querySelector('input[name="__RequestVerificationToken"]');
 
             try {
@@ -71,17 +73,17 @@ Vue.component('spin-wheel', {
                 });
                 const data = await resp.json();
 
-                if (!data.success) {
-                    alert(data.errorMessage || 'Could not spin. Please try again.');
+                if (!data.Success) {
+                    alert(data.ErrorMessage || 'Could not spin. Please try again.');
                     this.spinning = false;
                     return;
                 }
 
                 // Compute rotation to land pointer (top) on the winning segment's midpoint
                 let startAngle = 0;
-                for (let i = 0; i < data.winningSegmentIndex; i++)
+                for (let i = 0; i < data.WinningSegmentIndex; i++)
                     startAngle += (this.segments[i].probabilityWeight / this.totalWeight) * 360;
-                const segAngle = (this.segments[data.winningSegmentIndex].probabilityWeight / this.totalWeight) * 360;
+                const segAngle = (this.segments[data.WinningSegmentIndex].probabilityWeight / this.totalWeight) * 360;
                 const midAngle = startAngle + segAngle / 2;
                 const extraSpins = 6;
                 this.rotation += (360 * extraSpins) + (360 - midAngle) - (this.rotation % 360);
@@ -89,7 +91,7 @@ Vue.component('spin-wheel', {
                 setTimeout(() => {
                     this.result = data;
                     this.spinning = false;
-                    this.startCountdown(new Date(data.nextSpinAt));
+                    this.startCountdown(new Date(data.NextSpinAt));
                 }, 3200);
 
             } catch (e) {
@@ -109,7 +111,7 @@ Vue.component('spin-wheel', {
             tick();
         },
         copyCode() {
-            navigator.clipboard.writeText(this.result.couponCode)
+            navigator.clipboard.writeText(this.result.CouponCode)
                 .then(() => alert('Copied!'))
                 .catch(() => {});
         }
@@ -125,12 +127,12 @@ Vue.component('spin-wheel', {
         <!-- Result screen -->
         <div v-if="result" style="margin-bottom:32px;">
             <div style="font-size:48px;">&#127881;</div>
-            <h2 style="color:#059669;">You won {{ result.discountLabel }}!</h2>
+            <h2 style="color:#059669;">You won {{ result.DiscountLabel }}!</h2>
             <p style="color:#888;">Applied to your cart automatically.</p>
             <div style="border:2px dashed #059669;border-radius:8px;padding:16px;margin:16px auto;max-width:280px;background:#f0fdf4;">
                 <div style="font-size:11px;color:#888;text-transform:uppercase;letter-spacing:1px;">Your Coupon Code</div>
                 <div style="font-size:22px;font-weight:bold;font-family:monospace;letter-spacing:3px;color:#059669;margin:6px 0;">
-                    {{ result.couponCode }}
+                    {{ result.CouponCode }}
                 </div>
                 <button @click="copyCode" style="font-size:12px;background:none;border:1px solid #059669;color:#059669;padding:4px 12px;border-radius:4px;cursor:pointer;">
                     Copy Code
