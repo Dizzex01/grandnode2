@@ -1,0 +1,23 @@
+@model Promotion.SpinWheel.Models.SpinStateResult
+@{
+    Layout = "_SingleColumn";
+    ViewBag.Title = "Spin to Win";
+    var segmentsJson = System.Text.Json.JsonSerializer.Serialize(Model.Segments,
+        new System.Text.Json.JsonSerializerOptions { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase });
+    var canSpin = Model.CanSpin;
+    var nextSpinAt = Model.NextSpinAt.HasValue
+        ? Model.NextSpinAt.Value.ToString("o")
+        : null;
+}
+
+<div id="spin-wheel-app">
+    <spin-wheel
+        :segments='@Html.Raw(segmentsJson)'
+        :can-spin="@canSpin.ToString().ToLower()"
+        next-spin-at="@nextSpinAt"
+        execute-url="@Url.Action("Execute", "SpinWheel")"
+        cart-url="@Url.RouteUrl("ShoppingCart")">
+    </spin-wheel>
+</div>
+
+<script src="~/Plugins/Promotion.SpinWheel/spinwheel.js"></script>
